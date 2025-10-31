@@ -299,13 +299,14 @@ if menu == 'Login':
         username = st.text_input('Username')
         password = st.text_input('Password', type='password')
         submitted = st.form_submit_button('Login')
-    if submitted:
-        ok, msg = login_user(username.strip(), password)
-        if ok:
-            st.success(msg)
-            st.experimental_rerun()
-        else:
-            st.error(msg)
+   if submitted:
+    ok, msg = login_user(username.strip(), password)
+    if ok:
+        st.success(msg)
+        st.rerun()   # ✅ replaces experimental_rerun (new stable API)
+    else:
+        st.error(msg)
+
 
 # Manual Tests and Dashboard (requires login)
 if menu == 'Manual Tests':
