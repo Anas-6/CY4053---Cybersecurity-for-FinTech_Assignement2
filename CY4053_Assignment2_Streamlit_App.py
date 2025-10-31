@@ -426,9 +426,9 @@ if menu == 'About':
     - Test-case documentation table (download or recreate the table + screenshots)
     - Optional video demo link
 
+    ### Built-in Manual Tests
+    The app ships with 20 explicit manual test cases that you can perform. Use the "Manual Tests" page to run each step, take screenshots, and record observed results. The Save Observation action writes a record to the audit logs for traceability.
     ''')
-    st.markdown('### Built-in Manual Tests
-    The app ships with 20 explicit manual test cases that you can perform. Use the "Manual Tests" page to run each step, take screenshots, and record observed results. The Save Observation action writes a record to the audit logs for traceability.')
 
 # --------------------------- End of App -------------------------------------
 
