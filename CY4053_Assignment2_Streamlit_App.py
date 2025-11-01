@@ -497,8 +497,8 @@ def main():
             except:
                 pass
             st.session_state.clear()
-            st.success("✅ You have been logged out successfully.")
-            st.experimental_rerun()
+            st.success("😔 You have been logged out successfully.")
+            
 
     try:
         if page == "Home": show_home()
