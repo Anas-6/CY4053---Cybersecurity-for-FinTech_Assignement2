@@ -437,14 +437,35 @@ def show_audit_logs():
     uid = st.session_state["user_id"]
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT action, details, timestamp FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC LIMIT 50", (uid,))
+    c.execute(
+        "SELECT id, user_id, action, details, timestamp FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC LIMIT 200",
+        (uid,),
+    )
     rows = c.fetchall()
     conn.close()
+
     if not rows:
-        st.info("No logs yet.")
-    else:
-        for r in rows:
-            st.write(f"- [{r['timestamp']}] {r['action']} → {sanitize_text(r['details'] or '')}")
+        st.info("No logs found.")
+        return
+
+    # Convert to DataFrame for display and download
+    df = pd.DataFrame(rows, columns=["ID", "User ID", "Action", "Details", "Timestamp"])
+    st.dataframe(df, use_container_width=True)
+
+    # Convert to Excel
+    buffer = BytesIO()
+    df.to_excel(buffer, index=False, sheet_name="AuditLogs")
+    buffer.seek(0)
+
+    st.download_button(
+        "⬇️ Download Audit Logs (Excel)",
+        data=buffer,
+        file_name="audit_logs.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    st.caption("Logs include recent actions such as login, registration, wallet creation, etc.")
+
 
 def export_testcases_excel():
     st.header("Export Manual Testcases Template")
@@ -469,12 +490,14 @@ def main():
         st.session_state["username"] = None
 
     page = st.sidebar.selectbox("Navigation", ["Home", "Register", "Login", "Profile", "Wallets", "File Upload", "Encryption Tool", "Audit Logs", "Export Testcases"])
-    if require_login():
-        st.sidebar.markdown(f"**Logged in:** {sanitize_text(st.session_state['username'])}")
-        if st.sidebar.button("Logout"):
-            log_action(st.session_state["user_id"], "logout", "User logged out")
-            st.session_state["user_id"] = None
-            st.experimental_rerun()
+    if st.sidebar.button("Logout"):
+    try:
+        log_action(st.session_state.get("user_id"), "logout", "User logged out")
+    except:
+        pass
+    st.session_state.clear()
+    st.success("You have been logged out successfully.")
+    st.experimental_rerun()
 
     try:
         if page == "Home": show_home()
