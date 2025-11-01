@@ -495,9 +495,9 @@ def main():
             log_action(st.session_state.get("user_id"), "logout", "User logged out")
         except:
             pass
-    st.session_state.clear()
-    st.success("You have been logged out successfully.")
-    st.experimental_rerun()
+                st.session_state.clear()
+                st.success("You have been logged out successfully.")
+                st.experimental_rerun()
 
     try:
         if page == "Home": show_home()
