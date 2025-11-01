@@ -491,10 +491,10 @@ def main():
 
     page = st.sidebar.selectbox("Navigation", ["Home", "Register", "Login", "Profile", "Wallets", "File Upload", "Encryption Tool", "Audit Logs", "Export Testcases"])
     if st.sidebar.button("Logout"):
-    try:
-        log_action(st.session_state.get("user_id"), "logout", "User logged out")
-    except:
-        pass
+        try:
+            log_action(st.session_state.get("user_id"), "logout", "User logged out")
+        except:
+            pass
     st.session_state.clear()
     st.success("You have been logged out successfully.")
     st.experimental_rerun()
