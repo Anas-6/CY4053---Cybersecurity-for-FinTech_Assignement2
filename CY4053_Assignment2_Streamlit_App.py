@@ -9,6 +9,7 @@ import sqlite3
 import bcrypt
 import re
 import os
+import time
 from cryptography.fernet import Fernet
 from datetime import datetime
 import pandas as pd
@@ -503,6 +504,8 @@ def main():
     else:
         page = st.sidebar.selectbox("Navigation", ["Home","Register","Login","Profile","Wallets","File Upload","Encryption Tool","Audit Logs","Export Testcases"])
 
+    
+
     if require_login():
         st.sidebar.markdown(f"**Logged in:** {st.session_state['username']}")
         if st.sidebar.button("Logout"):
@@ -510,8 +513,16 @@ def main():
                 log_action(st.session_state.get("user_id"), "logout", "User logged out")
             except:
                 pass
+
+            # Clear session and show logout message
             st.session_state.clear()
             st.success("😔 You have been logged out successfully.")
+        
+        # Set page to login and wait briefly before rerun
+            st.session_state["force_page"] = "Login"
+            time.sleep(1.2)
+            st.rerun()
+
             
 
     try:
