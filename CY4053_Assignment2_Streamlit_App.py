@@ -127,8 +127,8 @@ CREATE TABLE IF NOT EXISTS transactions (
 )
 """)
 
-    conn.commit()
-    conn.close()
+conn.commit()
+conn.close()
 
 # ---------------------------
 # Security helpers
