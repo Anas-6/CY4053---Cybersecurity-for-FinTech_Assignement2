@@ -337,22 +337,31 @@ def show_login():
         submitted = st.form_submit_button("Login")
         if submitted:
             try:
+                # Check for empty fields
                 if not username.strip() or not password.strip():
                     st.warning("Please enter both username and password.")
+                    return
+
+                # --- SQL Injection pattern detection ---
+                if re.search(r"('|--|;|=| OR | AND |DROP |SELECT |INSERT |DELETE )", username, re.IGNORECASE):
+                    st.error("⚠️ Unsafe input detected. Please remove special characters or SQL keywords.")
+                    log_action(None, "login_blocked_sql_injection", f"attempt:{sanitize_text(username)}")
+                    return
+
+                # Normal login flow
+                user = get_user_by_username(username)
+                if user and verify_password(password, user["password_hash"]):
+                    st.session_state["user_id"] = user["id"]
+                    st.session_state["username"] = user["username"]
+                    st.success("Login successful.")
+                    log_action(user["id"], "login", "User logged in")
                 else:
-                    user = get_user_by_username(username)
-                    if user and verify_password(password, user["password_hash"]):
-                        st.session_state["user_id"] = user["id"]
-                        st.session_state["username"] = user["username"]
-                        st.success("Login successful.")
-                        log_action(user["id"], "login", "User logged in")
-                    else:
-                        st.error("Invalid username or password.")
-                        log_action(None, "login_failed", f"username_attempt:{username}")
-            except ValueError:
-                st.error("Invalid or unsafe input detected.")
-            except Exception:
+                    st.error("Invalid username or password.")
+                    log_action(None, "login_failed", f"username_attempt:{sanitize_text(username)}")
+            except Exception as e:
                 st.error("Login error.")
+                log_action(None, "login_error", str(e))
+
 
 def require_login():
     return "user_id" in st.session_state and st.session_state["user_id"]
