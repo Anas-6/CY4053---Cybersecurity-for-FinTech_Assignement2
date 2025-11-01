@@ -341,36 +341,62 @@ def show_wallets():
     st.caption("Add wallets and securely record encrypted transactions.")
     st.divider()
 
+    # Wallet creation form
     with st.form("create_wallet"):
-        name=st.text_input("Wallet Name");data=st.text_area("Private Data")
-        if st.form_submit_button("Create Wallet"):
-            if not name or not data: st.error("All fields required.")
-            else:
-                ok,msg=create_wallet(st.session_state["user_id"],sanitize_text(name),sanitize_text(data))
-                st.success(msg) if ok else st.error(msg)
+        name = st.text_input("Wallet name")
+        data = st.text_area("Private data")
+        create_wallet_btn = st.form_submit_button("Create Wallet")
+
+    if create_wallet_btn:
+        if not name or not data:
+            st.error("All fields required.")
+        else:
+            ok, msg = create_wallet(
+                st.session_state["user_id"],
+                sanitize_text(name),
+                sanitize_text(data)
+            )
+            st.success(msg) if ok else st.error(msg)
 
     st.divider()
-    wallets=get_wallets_for_user(st.session_state["user_id"])
-    if not wallets: st.info("No wallets yet.");return
+    wallets = get_wallets_for_user(st.session_state["user_id"])
+    if not wallets:
+        st.info("No wallets created yet.")
+        return
 
     for w in wallets:
         st.subheader(f"💳 {w['wallet_name']} — {w['created_at']}")
-        if st.button(f"Decrypt Wallet {w['id']}",key=f"d{w['id']}"):
-            try: st.code(decrypt_data(w["encrypted_data"]))
-            except: st.error("Decryption failed.")
 
+        # Wallet decryption button
+        if st.button(f"Decrypt Wallet {w['id']}", key=f"d{w['id']}"):
+            try:
+                decrypted = decrypt_data(w["encrypted_data"])
+                st.code(decrypted)
+            except:
+                st.error("Decryption failed or unauthorized attempt.")
+
+        # --- Add Transaction ---
         with st.form(f"txn_form_{w['id']}"):
-            num=st.text_input("Transaction Number (numeric only)",key=f"n{w['id']}")
-            if st.form_submit_button("Add Transaction"):
-                ok,msg=create_transaction(w["id"],num)
-                st.success(msg) if ok else st.error(msg)
+            txn_number = st.text_input("Transaction Number (numeric only)", key=f"txnnum_{w['id']}")
+            submit_txn = st.form_submit_button("Add Transaction")
 
-        if st.button(f"View Transactions — {w['wallet_name']}",key=f"v{w['id']}"):
-            tx=get_transactions(w["id"])
-            if not tx: st.info("No transactions yet.")
+        if submit_txn:
+            message_placeholder = st.empty()
+            ok, msg = create_transaction(w["id"], txn_number)
+            if ok:
+                message_placeholder.success(msg)
             else:
-                df=pd.DataFrame(tx,columns=["Transaction ID","Number","Created At"])
-                st.dataframe(df,use_container_width=True)
+                message_placeholder.error(msg)
+
+        # --- View Transactions ---
+        if st.button(f"View Transactions for {w['wallet_name']}", key=f"viewtx_{w['id']}"):
+            txns = get_transactions(w["id"])
+            if not txns:
+                st.info("No transactions yet.")
+            else:
+                df = pd.DataFrame(txns, columns=["Transaction ID", "Transaction Number", "Created At"])
+                st.dataframe(df, use_container_width=True)
+
 
 def show_file_upload():
     st.header("Secure File Upload")
