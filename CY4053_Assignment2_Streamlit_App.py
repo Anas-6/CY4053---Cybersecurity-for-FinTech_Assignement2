@@ -13,7 +13,7 @@ from cryptography.fernet import Fernet
 from datetime import datetime
 import pandas as pd
 from io import BytesIO
-
+import time
 # ---------------------------
 # Config / Paths
 # ---------------------------
@@ -496,10 +496,10 @@ def main():
                 log_action(st.session_state.get("user_id"), "logout", "User logged out")
             except:
                 pass
-            st.session_state.clear()
-            st.success("✅ You have been logged out successfully.")
-            st.experimental_rerun()
-
+        st.session_state.clear()
+        st.success("😔 You have been logged out successfully.")
+        time.sleep(1.2)  # short delay so message is visible
+        st.rerun()
     try:
         if page == "Home": show_home()
         elif page == "Register": show_register()
