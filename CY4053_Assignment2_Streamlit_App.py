@@ -142,11 +142,11 @@ def is_valid_email(email: str) -> bool:
 def sanitize_text(s: str) -> str:
     s = s.strip()
     if len(s) > 2000:
+        st.warning("⚠️ Input too long — trimmed to safe length.")
         s = s[:2000]
     s = re.sub(r"(?i)<.*?>", "", s)
     s = s.replace("<", "&lt;").replace(">", "&gt;")
 
-    # block SQL/command injection patterns
     forbidden = ["'", '"', ";", "--", "/*", "*/", "=", " or ", " and ", "drop ", "delete ", "insert ", "update "]
     lowered = s.lower()
     for token in forbidden:
@@ -308,6 +308,12 @@ def validate_uploaded_file(uploaded):
 # ---------------------------
 # UI Pages
 # ---------------------------
+# Track failed logins and lockouts
+if "failed_attempts" not in st.session_state:
+    st.session_state["failed_attempts"] = 0
+if "lockout_time" not in st.session_state:
+    st.session_state["lockout_time"] = None
+
 def show_home():
     st.title("🔐 Secure FinTech Mini App — Cyber Edition")
     st.markdown("This app demonstrates secure coding concepts for FinTech cybersecurity testing.")
@@ -332,37 +338,52 @@ def show_register():
 
 def show_login():
     st.header("User Login")
+
+    # --- Account lockout check ---
+    if st.session_state["lockout_time"]:
+        elapsed = time.time() - st.session_state["lockout_time"]
+        if elapsed < 60:
+            st.error(f"🚫 Account temporarily locked. Try again in {int(60 - elapsed)} seconds.")
+            return
+        else:
+            st.session_state["lockout_time"] = None
+            st.session_state["failed_attempts"] = 0
+
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
+
         if submitted:
             try:
-                # Check for empty fields
                 if not username.strip() or not password.strip():
                     st.warning("Please enter both username and password.")
                     return
 
-                # --- SQL Injection pattern detection ---
                 if re.search(r"('|--|;|=| OR | AND |DROP |SELECT |INSERT |DELETE )", username, re.IGNORECASE):
                     st.error("⚠️ Unsafe input detected. Please remove special characters or SQL keywords.")
-                    log_action(None, "login_blocked_sql_injection", f"attempt:{sanitize_text(username)}")
+                    log_action(None, "login_blocked_sql_injection", f"attempt:{username}")
                     return
 
-                # Normal login flow
                 user = get_user_by_username(username)
                 if user and verify_password(password, user["password_hash"]):
                     st.session_state["user_id"] = user["id"]
                     st.session_state["username"] = user["username"]
-                    st.success("Login successful.")
+                    st.session_state["failed_attempts"] = 0
+                    st.success("✅ Login successful.")
                     log_action(user["id"], "login", "User logged in")
                 else:
-                    st.error("Invalid username or password.")
-                    log_action(None, "login_failed", f"username_attempt:{sanitize_text(username)}")
-            except Exception as e:
-                st.error("Login error.")
-                log_action(None, "login_error", str(e))
-
+                    st.session_state["failed_attempts"] += 1
+                    remaining = 5 - st.session_state["failed_attempts"]
+                    if remaining > 0:
+                        st.error(f"Invalid username or password. {remaining} attempts left.")
+                    else:
+                        st.session_state["lockout_time"] = time.time()
+                        st.error("🚫 Too many failed attempts. Account locked for 1 minute.")
+                        log_action(None, "account_lockout", username)
+            except Exception:
+                st.error("Login error. Please try again later.")
+                log_action(None, "login_error", "Unexpected exception")
 
 def require_login():
     return "user_id" in st.session_state and st.session_state["user_id"]
@@ -422,7 +443,8 @@ def show_wallets():
                     st.text_area("Decrypted data:", decrypt_data(w["encrypted_data"]), height=100)
                     log_action(st.session_state["user_id"], "wallet_decrypt", f"wallet:{w['id']}")
                 except Exception:
-                    st.error("Decryption failed.")
+                    st.error("Decryption failed or unauthorized modification attempt detected.")
+                    log_action(st.session_state["user_id"], "unauthorized_access", f"wallet:{w['id']}")
 
 def show_file_upload():
     st.header("Secure File Upload")
@@ -455,6 +477,16 @@ def show_encryption_tool():
         except Exception:
             st.error("Invalid or corrupted token.")
 
+def show_error_test():
+    st.header("Secure Error-Handling Demo")
+    st.write("Use this to test controlled exception handling.")
+    if st.button("Force Divide-by-Zero Error"):
+        try:
+            _ = 1 / 0
+        except Exception:
+            st.error("⚠️ Controlled exception handled safely — no stack trace exposed.")
+            log_action(st.session_state.get("user_id"), "error_test_triggered", "divide_by_zero")
+
 def show_audit_logs():
     st.header("Activity Logs")
     uid = st.session_state["user_id"]
@@ -481,7 +513,7 @@ def export_testcases_excel():
     bio = BytesIO()
     df.to_excel(bio, index=False, sheet_name="testcases")
     bio.seek(0)
-    st.download_button("Download testcases.xlsx", data=bio, file_name="manual_testcases.xlsx")
+    st.download_button("Download testcases.xlsx", data=bio, file_name="manual_testcases_i229808.xlsx")
 
 # ---------------------------
 # Main
@@ -492,20 +524,15 @@ def main():
     init_crypto()
 
     # Sidebar + Logout
-    st.sidebar.markdown("<div class='neon-card'><h3 class='neon-accent'>Secure FinTech</h3></div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div class='neon-card'><h3 class='neon-accent'>Secure FinTech — by Anas (i229808)</h3></div>", unsafe_allow_html=True)
     if "user_id" not in st.session_state:
         st.session_state["user_id"] = None
         st.session_state["username"] = None
 
-    # If forced to login after logout, show Login page directly
-    if "force_page" in st.session_state:
-        page = st.session_state["force_page"]
-        st.session_state.clear()
-        st.success("😔 You have been logged out successfully.")
-    else:
-        page = st.sidebar.selectbox("Navigation", ["Home","Register","Login","Profile","Wallets","File Upload","Encryption Tool","Audit Logs","Export Testcases"])
-
-    
+    page = st.sidebar.selectbox(
+        "Navigation",
+        ["Home","Register","Login","Profile","Wallets","File Upload","Encryption Tool","Audit Logs","Export Testcases","Error Test"]
+    )
 
     if require_login():
         st.sidebar.markdown(f"**Logged in:** {st.session_state['username']}")
@@ -514,17 +541,10 @@ def main():
                 log_action(st.session_state.get("user_id"), "logout", "User logged out")
             except:
                 pass
-
-            # Clear session and show logout message
             st.session_state.clear()
-            st.success("😔 You have been logged out successfully.")
-        
-        # Set page to login and wait briefly before rerun
-            st.session_state["force_page"] = "Login"
+            st.success("👋 You have been logged out successfully.")
             time.sleep(1.2)
             st.rerun()
-
-            
 
     try:
         if page == "Home": show_home()
@@ -547,6 +567,8 @@ def main():
             else: st.warning("Login first.")
         elif page == "Export Testcases":
             export_testcases_excel()
+        elif page == "Error Test":
+            show_error_test()
     except Exception:
         st.error("An unexpected error occurred.")
         log_action(st.session_state.get("user_id"), "error_generic", "App crashed safely")
