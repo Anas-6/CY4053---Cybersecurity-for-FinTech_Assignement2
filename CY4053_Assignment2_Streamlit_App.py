@@ -484,20 +484,42 @@ def main():
     init_db()
     init_crypto()
 
+       # ---------------------------
+    # Sidebar (Navigation + Logout)
+    # ---------------------------
     st.sidebar.markdown("<div class='neon-card'><h3 class='neon-accent'>Secure FinTech</h3></div>", unsafe_allow_html=True)
+
     if "user_id" not in st.session_state:
         st.session_state["user_id"] = None
         st.session_state["username"] = None
 
-    page = st.sidebar.selectbox("Navigation", ["Home", "Register", "Login", "Profile", "Wallets", "File Upload", "Encryption Tool", "Audit Logs", "Export Testcases"])
-    if st.sidebar.button("Logout"):
-        try:
-            log_action(st.session_state.get("user_id"), "logout", "User logged out")
-        except:
-            pass
-                st.session_state.clear()
-                st.success("You have been logged out successfully.")
-                st.experimental_rerun()
+    # Navigation dropdown
+    page = st.sidebar.selectbox(
+        "Navigation",
+        [
+            "Home",
+            "Register",
+            "Login",
+            "Profile",
+            "Wallets",
+            "File Upload",
+            "Encryption Tool",
+            "Audit Logs",
+            "Export Testcases",
+        ],
+    )
+
+    # --- LOGOUT section (Fully Fixed) ---
+    if require_login():
+        st.sidebar.markdown(f"**Logged in:** {sanitize_text(st.session_state['username'])}")
+        if st.sidebar.button("Logout"):
+            try:
+                log_action(st.session_state.get("user_id"), "logout", "User logged out")
+            except:
+                pass
+            st.session_state.clear()
+            st.success("✅ You have been logged out successfully.")
+            st.experimental_rerun()
 
     try:
         if page == "Home": show_home()
