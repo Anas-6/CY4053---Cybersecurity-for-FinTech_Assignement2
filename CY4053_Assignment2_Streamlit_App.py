@@ -500,6 +500,8 @@ def main():
     # If forced to login after logout, show Login page directly
     if "force_page" in st.session_state:
         page = st.session_state["force_page"]
+        st.session_state.clear()
+        st.success("😔 You have been logged out successfully.")
         del st.session_state["force_page"]
     else:
         page = st.sidebar.selectbox("Navigation", ["Home","Register","Login","Profile","Wallets","File Upload","Encryption Tool","Audit Logs","Export Testcases"])
