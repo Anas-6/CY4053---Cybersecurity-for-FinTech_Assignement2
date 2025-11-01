@@ -3,7 +3,7 @@ streamlit_app.py
 Secure FinTech mini-app for CY4053 Assignment 2
 Final Hardened Version — secure, cyber-themed, and assignment-complete.
 """
-
+import random, string
 import streamlit as st
 import sqlite3
 import bcrypt
@@ -114,6 +114,19 @@ def init_db():
         timestamp TEXT NOT NULL
     )
     """)
+    # transactions
+c.execute("""
+CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet_id INTEGER NOT NULL,
+    transaction_id TEXT NOT NULL,
+    transaction_number TEXT NOT NULL,
+    encrypted_data BLOB NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(wallet_id) REFERENCES wallets(id)
+)
+""")
+
     conn.commit()
     conn.close()
 
@@ -131,6 +144,35 @@ def verify_password(pw: str, pw_hash: bytes) -> bool:
 
 PASSWORD_REGEX = re.compile(r"^(?=.{8,})(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).*$")
 EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+
+
+
+
+def create_transaction(wallet_id, number):
+    try:
+        if not re.match(r"^[0-9]+$", number):
+            return False, "Transaction number must be numeric."
+        txid = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+        enc = encrypt_data(f"Transaction {txid} - {number}")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("INSERT INTO transactions (wallet_id,transaction_id,transaction_number,encrypted_data,created_at) VALUES (?,?,?,?,?)",
+                  (wallet_id, txid, number, enc, datetime.utcnow().isoformat()))
+        conn.commit()
+        conn.close()
+        log_action(None, "create_transaction", f"wallet:{wallet_id},tx:{txid}")
+        return True, "Transaction added successfully."
+    except Exception:
+        return False, "Transaction failed."
+
+def get_transactions(wallet_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT transaction_id, transaction_number, created_at FROM transactions WHERE wallet_id=?", (wallet_id,))
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
 
 def is_strong_password(pw: str) -> bool:
     return bool(PASSWORD_REGEX.match(pw))
@@ -419,32 +461,52 @@ def show_profile():
                 else: st.error(msg)
 
 def show_wallets():
-    st.header("Wallets (Encrypted Data)")
+    st.header("💼 Wallets & Transactions")
     st.divider()
+
+    # Wallet creation form
     with st.form("create_wallet"):
         name = st.text_input("Wallet name")
         data = st.text_area("Private data")
-        if st.form_submit_button("Create"):
+        if st.form_submit_button("Create Wallet"):
             if not name or not data:
                 st.error("All fields required.")
             else:
                 ok, msg = create_wallet(st.session_state["user_id"], sanitize_text(name), sanitize_text(data))
                 if ok: st.success(msg)
                 else: st.error(msg)
+    
     st.divider()
     wallets = get_wallets_for_user(st.session_state["user_id"])
     if not wallets:
         st.info("No wallets created yet.")
-    else:
-        for w in wallets:
-            st.write(f"**{w['wallet_name']}** — created {w['created_at']}")
-            if st.button(f"Decrypt Wallet {w['id']}", key=f"dec_{w['id']}"):
-                try:
-                    st.text_area("Decrypted data:", decrypt_data(w["encrypted_data"]), height=100)
-                    log_action(st.session_state["user_id"], "wallet_decrypt", f"wallet:{w['id']}")
-                except Exception:
-                    st.error("Decryption failed or unauthorized modification attempt detected.")
-                    log_action(st.session_state["user_id"], "unauthorized_access", f"wallet:{w['id']}")
+        return
+
+    for w in wallets:
+        st.subheader(f"💳 {w['wallet_name']} — created {w['created_at']}")
+        if st.button(f"Decrypt Wallet {w['id']}", key=f"dec_{w['id']}"):
+            try:
+                st.code(decrypt_data(w["encrypted_data"]))
+            except:
+                st.error("Decryption failed or unauthorized attempt.")
+
+        # --- Add Transaction ---
+        with st.form(f"txn_form_{w['id']}"):
+            txn_number = st.text_input("Transaction Number (numeric only)", key=f"txnnum_{w['id']}")
+            if st.form_submit_button("Add Transaction"):
+                ok, msg = create_transaction(w["id"], txn_number)
+                if ok: st.success(msg)
+                else: st.error(msg)
+
+        # --- View Transactions ---
+        if st.button(f"View Transactions for {w['wallet_name']}", key=f"viewtx_{w['id']}"):
+            txns = get_transactions(w["id"])
+            if not txns:
+                st.info("No transactions yet.")
+            else:
+                df = pd.DataFrame(txns, columns=["Transaction ID", "Transaction Number", "Created At"])
+                st.dataframe(df, use_container_width=True)
+
 
 def show_file_upload():
     st.header("Secure File Upload")
