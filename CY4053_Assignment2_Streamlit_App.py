@@ -489,17 +489,19 @@ def main():
 
     page = st.sidebar.selectbox("Navigation", ["Home","Register","Login","Profile","Wallets","File Upload","Encryption Tool","Audit Logs","Export Testcases"])
 
-    if require_login():
-        st.sidebar.markdown(f"**Logged in:** {st.session_state['username']}")
-        if st.sidebar.button("Logout"):
-            try:
-                log_action(st.session_state.get("user_id"), "logout", "User logged out")
-            except:
-                pass
+
+if require_login():
+    st.sidebar.markdown(f"**Logged in:** {st.session_state['username']}")
+    if st.sidebar.button("Logout"):
+        try:
+            log_action(st.session_state.get("user_id"), "logout", "User logged out")
+        except:
+            pass
         st.session_state.clear()
-        st.success("😔 You have been logged out successfully.")
-        time.sleep(1.2)  # short delay so message is visible
+        st.success("👋 You have been logged out successfully.")
+        time.sleep(1.2)
         st.rerun()
+    
     try:
         if page == "Home": show_home()
         elif page == "Register": show_register()
