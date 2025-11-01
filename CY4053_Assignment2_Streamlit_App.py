@@ -1,7 +1,9 @@
 """
 streamlit_app.py
-Secure FinTech mini-app for CY4053 Assignment 2
-Final Hardened Version — by Anas (i229808)
+Cybersecurity For Fintech
+Muhammad Anas (i229808)
+Submitted To: Sir, Usama Arshad
+Assignemnt 2
 """
 
 import random, string, os, re, time, bcrypt, sqlite3, pandas as pd
