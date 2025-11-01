@@ -496,7 +496,12 @@ def main():
         st.session_state["user_id"] = None
         st.session_state["username"] = None
 
-    page = st.sidebar.selectbox("Navigation", ["Home","Register","Login","Profile","Wallets","File Upload","Encryption Tool","Audit Logs","Export Testcases"])
+    # If forced to login after logout, show Login page directly
+    if "force_page" in st.session_state:
+        page = st.session_state["force_page"]
+        del st.session_state["force_page"]
+    else:
+        page = st.sidebar.selectbox("Navigation", ["Home","Register","Login","Profile","Wallets","File Upload","Encryption Tool","Audit Logs","Export Testcases"])
 
     if require_login():
         st.sidebar.markdown(f"**Logged in:** {st.session_state['username']}")
