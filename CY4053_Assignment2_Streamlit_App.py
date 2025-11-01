@@ -1,7 +1,7 @@
 """
 streamlit_app.py
 Secure FinTech mini-app for CY4053 Assignment 2
-Enhanced version with better validation, sanitization, and feedback.
+Final Hardened Version — secure, cyber-themed, and assignment-complete.
 """
 
 import streamlit as st
@@ -9,7 +9,6 @@ import sqlite3
 import bcrypt
 import re
 import os
-import base64
 from cryptography.fernet import Fernet
 from datetime import datetime
 import pandas as pd
@@ -129,23 +128,29 @@ def verify_password(pw: str, pw_hash: bytes) -> bool:
     except Exception:
         return False
 
-PASSWORD_REGEX = re.compile(
-    r"^(?=.{8,})(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).*$"
-)
+PASSWORD_REGEX = re.compile(r"^(?=.{8,})(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).*$")
+EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+
 def is_strong_password(pw: str) -> bool:
     return bool(PASSWORD_REGEX.match(pw))
 
-EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
 def is_valid_email(email: str) -> bool:
     return bool(EMAIL_REGEX.match(email))
 
-# --- Improved sanitization ---
+# --- STRONG Sanitization & SQL Injection Protection ---
 def sanitize_text(s: str) -> str:
     s = s.strip()
     if len(s) > 2000:
         s = s[:2000]
-    s = re.sub(r"(?i)<.*?>", "", s)  # remove all tags
+    s = re.sub(r"(?i)<.*?>", "", s)
     s = s.replace("<", "&lt;").replace(">", "&gt;")
+
+    # block SQL/command injection patterns
+    forbidden = ["'", '"', ";", "--", "/*", "*/", "=", " or ", " and ", "drop ", "delete ", "insert ", "update "]
+    lowered = s.lower()
+    for token in forbidden:
+        if token in lowered:
+            raise ValueError("Invalid or unsafe characters in input.")
     return s
 
 # ---------------------------
@@ -166,8 +171,12 @@ def log_action(user_id, action, details=None):
 # User operations
 # ---------------------------
 def register_user(username, email, password):
-    username = sanitize_text(username)
-    email = sanitize_text(email)
+    try:
+        username = sanitize_text(username)
+        email = sanitize_text(email)
+    except ValueError as e:
+        return False, str(e)
+
     if not username or not email or not password:
         return False, "All fields are required."
     if not is_valid_email(email):
@@ -191,6 +200,10 @@ def register_user(username, email, password):
         return False, "Registration failed due to system error."
 
 def get_user_by_username(username):
+    try:
+        username = sanitize_text(username)
+    except ValueError:
+        return None
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE username = ?", (username,))
@@ -313,10 +326,8 @@ def show_register():
                 st.warning("Passwords do not match.")
             else:
                 ok, msg = register_user(username, email, password)
-                if ok:
-                    st.success(msg)
-                else:
-                    st.error(msg)
+                if ok: st.success(msg)
+                else: st.error(msg)
 
 def show_login():
     st.header("User Login")
@@ -337,7 +348,9 @@ def show_login():
                         log_action(user["id"], "login", "User logged in")
                     else:
                         st.error("Invalid username or password.")
-                        log_action(None, "login_failed", f"username_attempt:{sanitize_text(username)}")
+                        log_action(None, "login_failed", f"username_attempt:{username}")
+            except ValueError:
+                st.error("Invalid or unsafe input detected.")
             except Exception:
                 st.error("Login error.")
 
@@ -350,8 +363,8 @@ def show_profile():
     if not user:
         st.error("User not found.")
         return
-    st.write(f"**Username:** {sanitize_text(user['username'])}")
-    st.write(f"**Email:** {sanitize_text(user['email'])}")
+    st.write(f"**Username:** {user['username']}")
+    st.write(f"**Email:** {user['email']}")
     st.divider()
     st.subheader("Update Email")
     with st.form("email_form"):
@@ -393,7 +406,7 @@ def show_wallets():
         st.info("No wallets created yet.")
     else:
         for w in wallets:
-            st.write(f"**{sanitize_text(w['wallet_name'])}** — created {w['created_at']}")
+            st.write(f"**{w['wallet_name']}** — created {w['created_at']}")
             if st.button(f"Decrypt Wallet {w['id']}", key=f"dec_{w['id']}"):
                 try:
                     st.text_area("Decrypted data:", decrypt_data(w["encrypted_data"]), height=100)
@@ -437,35 +450,19 @@ def show_audit_logs():
     uid = st.session_state["user_id"]
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute(
-        "SELECT id, user_id, action, details, timestamp FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC LIMIT 200",
-        (uid,),
-    )
+    c.execute("SELECT id, user_id, action, details, timestamp FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC LIMIT 200", (uid,))
     rows = c.fetchall()
     conn.close()
-
     if not rows:
         st.info("No logs found.")
         return
-
-    # Convert to DataFrame for display and download
     df = pd.DataFrame(rows, columns=["ID", "User ID", "Action", "Details", "Timestamp"])
     st.dataframe(df, use_container_width=True)
-
-    # Convert to Excel
     buffer = BytesIO()
     df.to_excel(buffer, index=False, sheet_name="AuditLogs")
     buffer.seek(0)
-
-    st.download_button(
-        "⬇️ Download Audit Logs (Excel)",
-        data=buffer,
-        file_name="audit_logs.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
+    st.download_button("⬇️ Download Audit Logs (Excel)", data=buffer, file_name="audit_logs.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     st.caption("Logs include recent actions such as login, registration, wallet creation, etc.")
-
 
 def export_testcases_excel():
     st.header("Export Manual Testcases Template")
@@ -484,34 +481,16 @@ def main():
     init_db()
     init_crypto()
 
-       # ---------------------------
-    # Sidebar (Navigation + Logout)
-    # ---------------------------
+    # Sidebar + Logout
     st.sidebar.markdown("<div class='neon-card'><h3 class='neon-accent'>Secure FinTech</h3></div>", unsafe_allow_html=True)
-
     if "user_id" not in st.session_state:
         st.session_state["user_id"] = None
         st.session_state["username"] = None
 
-    # Navigation dropdown
-    page = st.sidebar.selectbox(
-        "Navigation",
-        [
-            "Home",
-            "Register",
-            "Login",
-            "Profile",
-            "Wallets",
-            "File Upload",
-            "Encryption Tool",
-            "Audit Logs",
-            "Export Testcases",
-        ],
-    )
+    page = st.sidebar.selectbox("Navigation", ["Home","Register","Login","Profile","Wallets","File Upload","Encryption Tool","Audit Logs","Export Testcases"])
 
-    # --- LOGOUT section (Fully Fixed) ---
     if require_login():
-        st.sidebar.markdown(f"**Logged in:** {sanitize_text(st.session_state['username'])}")
+        st.sidebar.markdown(f"**Logged in:** {st.session_state['username']}")
         if st.sidebar.button("Logout"):
             try:
                 log_action(st.session_state.get("user_id"), "logout", "User logged out")
