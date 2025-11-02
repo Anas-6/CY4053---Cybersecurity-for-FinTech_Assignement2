@@ -111,14 +111,14 @@ All test evidence (screenshots + results) are documented in:
 ### 🖥️ Run Locally
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/SecureFinTechApp.git
-cd SecureFinTechApp
+git clone https://github.com/anas-6/CY4053_Assignment2_Streamlit_App.git
+cd CY4053_Assignment2_Streamlit_App
 
 # 2. Install dependencies
 pip install -r requirements.txt
 
 # 3. Run the Streamlit app
-streamlit run streamlit_app.py
+streamlit run CY4053_Assignment2_Streamlit_App.py
 
 
 
