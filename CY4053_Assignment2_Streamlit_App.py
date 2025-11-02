@@ -450,7 +450,7 @@ def show_error_test():
 def main():
     inject_css();init_db();init_crypto()
 
-    st.sidebar.markdown("<div class='neon-card'><h3 class='neon-accent'>Secure FinTech — by Anas (i229808)</h3></div>",unsafe_allow_html=True)
+    st.sidebar.markdown("<div class='neon-card'><h3 class='neon-accent'>Secure FinTech </h3></div>",unsafe_allow_html=True)
     if "user_id" not in st.session_state: st.session_state["user_id"]=None
     if "username" not in st.session_state: st.session_state["username"]=None
 
